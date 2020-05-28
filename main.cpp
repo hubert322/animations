@@ -10,7 +10,8 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, PSTR, INT iCmdShow)
 	MSG                 msg;
 	WNDCLASS            wndClass;
 
-	// Initialize GDI+.	gdiplusStartup();
+	// Initialize GDI
+	gdiplusStartup();
 	initPaint();
 
 	wndClass.style = CS_HREDRAW | CS_VREDRAW;
@@ -39,7 +40,7 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, PSTR, INT iCmdShow)
 		hInstance,                // program instance handle
 		NULL);                    // creation parameters
 
-	SetTimer(hWnd, 1, 100, NULL);
+	//SetTimer(hWnd, 1, 100, NULL);
 
 	ShowWindow(hWnd, iCmdShow);
 	UpdateWindow(hWnd);

@@ -391,5 +391,5 @@ void paint(HDC hdc)
 	Gdiplus::Graphics graphics(hdc);
 	const int mainShapePenWidth = 10;
 	paintMainShape(graphics);
-	//paintParticles(graphics);
+	paintParticles(graphics);
 }
