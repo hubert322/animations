@@ -189,7 +189,7 @@ static void initParticles()
 				else if (pipes[i].direction == southWest)
 				{
 					x -= dx;
-					y += dy;
+					y -= dy;
 					translateX = translateY = particleSize / 2 * -1;
 				}
 				// top left to bottom right
@@ -210,19 +210,58 @@ void initPaint()
 	initParticles();
 }
 
+static Gdiplus::Point* getPolyPoints(directionEnum direction, float x1, float y1, float x2, float y2, float theta)
+{
+	Gdiplus::Point *polyPoints = (Gdiplus::Point *)malloc(sizeof(Gdiplus::Point) * 4);
+	switch (direction)
+	{
+	case north:
+	case south:
+		polyPoints[0] = { (int)round(x1 - mainShapePenWidth / 2.0), (int)round(y1) };
+		polyPoints[1] = { (int)round(x1 - mainShapePenWidth / 2.0), (int)round(y2) };
+		polyPoints[2] = { (int)round(x2 + mainShapePenWidth / 2.0), (int)round(y2) };
+		polyPoints[3] = { (int)round(x2 + mainShapePenWidth / 2.0), (int)round(y1) };
+		break;
+	case east:
+	case west:
+		polyPoints[0] = { (int)round(x1), (int)round(y1 - mainShapePenWidth / 2.0) };
+		polyPoints[1] = { (int)round(x1), (int)round(y1 + mainShapePenWidth / 2.0) };
+		polyPoints[2] = { (int)round(x2), (int)round(y2 + mainShapePenWidth / 2.0) };
+		polyPoints[3] = { (int)round(x2), (int)round(y2 - mainShapePenWidth / 2.0) };
+		break;
+	default:
+		polyPoints[0] = { (int)round(x1 + cos(theta) * mainShapePenWidth / 2.0), (int)round(y1 - sin(theta) * mainShapePenWidth / 2.0) };
+		polyPoints[1] = { (int)round(x1 - cos(theta) * mainShapePenWidth / 2.0), (int)round(y1 + sin(theta) * mainShapePenWidth / 2.0) };
+		polyPoints[2] = { (int)round(x2 - cos(theta) * mainShapePenWidth / 2.0), (int)round(y2 + sin(theta) * mainShapePenWidth / 2.0) };
+		polyPoints[3] = { (int)round(x2 + cos(theta) * mainShapePenWidth / 2.0), (int)round(y2 - sin(theta) * mainShapePenWidth / 2.0) };
+	}
+	return polyPoints;
+}
+
 static void paintMainShape(Gdiplus::Graphics &graphics)
 {
 	const Gdiplus::Color penColor(255, 0, 0, 255);
 	Gdiplus::Pen pen(penColor, mainShapePenWidth);
+	graphics.ResetClip();
+	Gdiplus::GraphicsPath path;
 
 	for (int i = 0; i < pipesLength; ++i)
 	{
-		int x1 = pipes[i].x1;
-		int y1 = pipes[i].y1;
-		int x2 = pipes[i].x2;
-		int y2 = pipes[i].y2;
+		float x1 = pipes[i].x1;
+		float y1 = pipes[i].y1;
+		float x2 = pipes[i].x2;
+		float y2 = pipes[i].y2;
+
+		Gdiplus::Point *polyPoints = getPolyPoints(pipes[i].direction, x1, y1, x2, y2, pipes[i].theta);
+		path.AddPolygon(polyPoints, 4);
+		delete polyPoints;
+
 		graphics.DrawLine(&pen, x1, y1, x2, y2);
 	}
+	Gdiplus::Region region(&path);
+	graphics.SetClip(&region);
+	//Gdiplus::Pen pen2(Gdiplus::Color(255, 0, 255, 0));
+	//graphics.DrawPath(&pen2, &path);
 }
 
 static void setParticleInRange(float *x, float *y, int pipesIndex)
@@ -245,20 +284,22 @@ static void setParticleInRange(float *x, float *y, int pipesIndex)
 			*y = pipes[pipesIndex].y1;
 		break;
 	case southWest:
-		if (*x < pipes[pipesIndex].x2 - marginAndParticleSize)
-			*x = pipes[pipesIndex].x1;
-		if (*y > pipes[pipesIndex].y2 + marginAndParticleSize)
-			*y = pipes[pipesIndex].y1;
+		if (*x < pipes[pipesIndex].x2 - marginAndParticleSize || *y > pipes[pipesIndex].y2 + marginAndParticleSize)
+		{
+			*x = pipes[pipesIndex].x1 + 20.0f * cos(pipes[pipesIndex].theta);
+			*y = pipes[pipesIndex].y1 + 20.0f * sin(pipes[pipesIndex].theta);
+		}
 		break;
 	case west:
 		if (*x < pipes[pipesIndex].x2 - marginAndParticleSize)
 			*x = pipes[pipesIndex].x1;
 		break;
 	case northWest:
-		if (*x < pipes[pipesIndex].x2 - marginAndParticleSize)
-			*x = pipes[pipesIndex].x1;
-		if (*y < pipes[pipesIndex].y2 - marginAndParticleSize)
-			*y = pipes[pipesIndex].y1;
+		if (*x < pipes[pipesIndex].x2 - marginAndParticleSize || *y < pipes[pipesIndex].y2 - marginAndParticleSize)
+		{
+			*x = pipes[pipesIndex].x1 + 20.0f * cos(pipes[pipesIndex].theta);
+			*y = pipes[pipesIndex].y1 + 20.0f * sin(pipes[pipesIndex].theta);
+		}
 		break;
 	}
 }
@@ -268,80 +309,8 @@ static void paintParticles(Gdiplus::Graphics &graphics)
 	Gdiplus::Color circleColor(255, 255, 0, 0);
 	Gdiplus::SolidBrush solidBrush(circleColor);
 	float particleSize = mainShapePenWidth;
-
-
-	//graphics.ResetClip();
-	//Gdiplus::Point polyPoints[4] = {
-	//	{ 300, 95 },
-	//	{ 100, 95 },
-	//	{ 100, 105 },
-	//	{ 300, 105 }
-	//};
-	//Gdiplus::GraphicsPath path;
-	//path.AddPolygon(polyPoints, 4);
-
-	//Gdiplus::Point polyPoints2[4] = {
-	//	{ 95, 100 },
-	//	{ 95, 400 },
-	//	{ 105, 400 },
-	//	{ 105, 100 }
-	//};
-	//path.AddPolygon(polyPoints2, 4);
-
-	//Gdiplus::Region region(&path);
-	//graphics.SetClip(&region);
-	//Gdiplus::Pen pen(Gdiplus::Color(255, 0, 255, 0));
-	//graphics.DrawPath(&pen, &path);
-
-	for (int i = 0; i < particlesLength; ++i)
+	for (int i = 0; i < pipesLength; ++i)
 	{
-		//Gdiplus::Point polyPoints[4] = {
-		//	{ points[i].X - mainShapePenWidth / 2, points[i].Y - mainShapePenWidth / 2 },
-		//	{ points[i].X + mainShapePenWidth / 2, points[i].Y + mainShapePenWidth / 2 },
-		//	{ points[i + 1].X - mainShapePenWidth / 2, points[i + 1].Y - mainShapePenWidth / 2 },
-		//	{ points[i + 1].X + mainShapePenWidth / 2, points[i + 1].Y + mainShapePenWidth / 2 }
-		//};
-
-		//Gdiplus::GraphicsPath path;
-		//path.AddPolygon(polyPoints, 4);
-		//Gdiplus::Region region(&path);
-		//graphics.SetClip(&region);
-
-		//Gdiplus::Pen pen(Gdiplus::Color(255, 0, 255, 0));
-		//graphics.DrawPath(&pen, &path);
-
-		//int x1 = points[i].X;
-		//int y1 = points[i].Y;
-		//int x2 = points[i + 1].X;
-		//int y2 = points[i + 1].Y;
-
-		//float dx = abs(points[i].X - points[i + 1].X);
-		//float dy = abs(points[i].Y - points[i + 1].Y);
-		//float theta = atan2(dy, dx);
-
-		//switch (particles[i].particle[0].direction)
-		//{
-		//case north:
-		//	break;
-		//case northEast:
-		//	break;
-		//case east:
-		//	break;
-		//case south:
-		//	break;
-		//case southWest:
-		//	break;
-		//case west:
-		//	Gdiplus::Point polyPoints[4] = {
-		//		{ x1, y1 - mainShapePenWidth / 2 },
-		//		{ x2, y1 - mainShapePenWidth / 2 },
-		//		{ x2, y2 - mainShapePenWidth / 2 },
-		//		{ 300, 105 }
-		//	};
-		//	break;
-		//case northWest:
-		//	break;
-		//}
 		float dx = 0;
 		float dy = 0;
 		switch (pipes[i].direction)
@@ -359,7 +328,7 @@ static void paintParticles(Gdiplus::Graphics &graphics)
 			break;
 		case southWest:
 			dx -= velocity * cos(pipes[i].theta);
-			dy += velocity * sin(pipes[i].theta);
+			dy -= velocity * sin(pipes[i].theta);
 			break;
 		case west:
 			dx -= velocity;
