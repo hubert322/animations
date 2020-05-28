@@ -33,6 +33,7 @@ struct ParticleArray
 {
 	Particle *particle;
 	int particleLength;
+	int firstIndex;
 };
 
 Gdiplus::GdiplusStartupInput gdiplusStartupInput;
@@ -44,7 +45,7 @@ int particlesLength;
 const float pipeWidth = 10.0f;
 const float margin = 20.0f;
 const float particleWidth = 10.0f;
-const float velocity = 10;
+const float velocity = 5;
 
 void gdiplusStartup()
 {
@@ -134,37 +135,55 @@ static void initParticles()
 
 		particles[i].particle = (Particle *)malloc(sizeof(Particle) * numParticles);
 		particles[i].particleLength = numParticles;
+		particles[i].firstIndex = 0;
 		for (int j = 0; j < numParticles; ++j)
 		{
 			float x = pipes[i].x1;
 			float y = pipes[i].y1;
 			float translateX = 0;
 			float translateY = 0;
-			float mainAxisDiff = (margin + pipeWidth) * (j) - margin;
+			float mainAxisDiff = j == 0 ? -1 * (margin + particleWidth)  : (margin + particleWidth) * (j - 1) + particleWidth;
 			float crossAxisDiff = pipeWidth / 2.0f;
 
 			if (pipes[i].direction == north || pipes[i].direction == south)
 			{
 				x -= crossAxisDiff;
 				if (pipes[i].direction == north)
-					y -= mainAxisDiff;
+				{
+					if (j == 0)
+						y += margin;
+					else
+						y -= (margin + particleWidth) * (j - 1) + particleWidth;
+				}
 				else
-					y += mainAxisDiff;
+				{
+					if (j == 0)
+						y -= margin + particleWidth;
+					else
+						y += (margin + particleWidth) * (j - 1);
+				}
 			}
 			else if (pipes[i].direction == east || pipes[i].direction == west)
 			{
 				y -= crossAxisDiff;
 				if (pipes[i].direction == west)
-					x -= mainAxisDiff;
+				{
+					if (j == 0)
+						x += margin;
+					else
+						x -= (margin + particleWidth) * (j - 1) + particleWidth;
+				}
 				else
-					x += mainAxisDiff;
+				{
+					if (j == 0)
+						x -= margin + particleWidth;
+					else
+						x += (margin + particleWidth) * (j - 1);
+				}
 			}
 			else
 			{
-				float dx = mainAxisDiff * cos(pipes[i].theta);
-				float dy = mainAxisDiff * sin(pipes[i].theta);
-				x -= dx;
-				y -= dy;
+				float diff = j == 0 ? -1 * margin : (margin + particleWidth) * (j - 1) + particleWidth;
 				if (pipes[i].direction == northWest || pipes[i].direction == southEast)
 				{
 					translateX = particleWidth / 2;
@@ -174,6 +193,8 @@ static void initParticles()
 				{
 					translateX = translateY = particleWidth / 2 * -1;
 				}
+				x -= diff * cos(pipes[i].theta);
+				y -= diff * sin(pipes[i].theta);
 			}
 			particles[i].particle[j] = { x, y, translateX, translateY };
 		}
@@ -188,7 +209,7 @@ void initPaint()
 	{
 		points[i] = (float *)malloc(sizeof(float) * 2);
 	}
-	points[0][0] = 300.0f; points[0][1] = 200.0f;
+	points[0][0] = 300.0f; points[0][1] = 300.0f;
 	points[1][0] = 300.0f; points[1][1] = 100.0f;
 	points[2][0] = 100.0f; points[2][1] = 100.0f;
 	points[3][0] = 100.0f; points[3][1] = 400.0f;
@@ -256,8 +277,8 @@ static void paintPipes(Gdiplus::Graphics *graphics)
 	graphics->DrawPath(&pen, &pipesPath);
 	Gdiplus::Region region(&clippingPath);
 	graphics->SetClip(&region);
-	//Gdiplus::Pen pen2(Gdiplus::Color(255, 0, 255, 0));
-	//graphics->DrawPath(&pen2, &path);
+	Gdiplus::Pen pen2(Gdiplus::Color(255, 0, 255, 0));
+	graphics->DrawPath(&pen2, &clippingPath);
 }
 
 static void setDxDy(float *dx, float *dy, directionEnum direction, float theta)
@@ -288,53 +309,54 @@ static void setDxDy(float *dx, float *dy, directionEnum direction, float theta)
 	}
 }
 
-static void setParticleInRange(float *x, float *y, int pipesIndex)
+static void setParticleInRange(float *x, float *y, int pipesIndex, int currentParticleIndex)
 {
 	switch (pipes[pipesIndex].direction)
 	{
 	case north:
-		if (*y < pipes[pipesIndex].y2 - margin - particleWidth)
-			*y = pipes[pipesIndex].y1;
-		break;
-	case northEast:
-		if (*x > pipes[pipesIndex].x2 + margin - particleWidth || *y < pipes[pipesIndex].y2 - margin - particleWidth)
+		if (*y < pipes[pipesIndex].y2 - particleWidth)
 		{
-			*x = pipes[pipesIndex].x1 + margin * cos(pipes[pipesIndex].theta);
-			*y = pipes[pipesIndex].y1 + margin * sin(pipes[pipesIndex].theta);
+			*y = particles[pipesIndex].particle[particles[pipesIndex].firstIndex].y + margin + particleWidth;
+			particles[pipesIndex].firstIndex = currentParticleIndex;
 		}
-		break;
+		return;
 	case east:
-		if (*x > pipes[pipesIndex].x2 + margin + particleWidth)
-			*x = pipes[pipesIndex].x1;
-		break;
-	case southEast:
-		if (*x > pipes[pipesIndex].x2 + margin + particleWidth || *y > pipes[pipesIndex].y2 + margin + particleWidth)
+		if (*x > pipes[pipesIndex].x2)
 		{
-			*x = pipes[pipesIndex].x1 + margin * cos(pipes[pipesIndex].theta);
-			*y = pipes[pipesIndex].y1 + margin * sin(pipes[pipesIndex].theta);
+			*x = particles[pipesIndex].particle[particles[pipesIndex].firstIndex].x - margin - particleWidth;
+			particles[pipesIndex].firstIndex = currentParticleIndex;
 		}
+		return;
 	case south:
-		if (*y > pipes[pipesIndex].y2 + margin + particleWidth)
-			*y = pipes[pipesIndex].y1;
-		break;
-	case southWest:
-		if (*x < pipes[pipesIndex].x2 - margin - particleWidth || *y > pipes[pipesIndex].y2 + margin + particleWidth)
+		if (*y > pipes[pipesIndex].y2)
 		{
-			*x = pipes[pipesIndex].x1 + margin * cos(pipes[pipesIndex].theta);
-			*y = pipes[pipesIndex].y1 + margin * sin(pipes[pipesIndex].theta);
+			*y = particles[pipesIndex].particle[particles[pipesIndex].firstIndex].y - margin - particleWidth;
+			particles[pipesIndex].firstIndex = currentParticleIndex;
 		}
-		break;
+		return;
 	case west:
-		if (*x < pipes[pipesIndex].x2 - margin - particleWidth)
-			*x = pipes[pipesIndex].x1;
-		break;
-	case northWest:
-		if (*x < pipes[pipesIndex].x2 - margin - particleWidth || *y < pipes[pipesIndex].y2 - margin - particleWidth)
+		if (*x < pipes[pipesIndex].x2 - particleWidth)
 		{
-			*x = pipes[pipesIndex].x1 + margin * cos(pipes[pipesIndex].theta);
-			*y = pipes[pipesIndex].y1 + margin * sin(pipes[pipesIndex].theta);
+			*x = particles[pipesIndex].particle[particles[pipesIndex].firstIndex].x + margin + particleWidth;
+			particles[pipesIndex].firstIndex = currentParticleIndex;
 		}
-		break;
+		return;
+	}
+
+	float cosine = cos(pipes[pipesIndex].theta);
+	float sine = sin(pipes[pipesIndex].theta);
+	if ((pipes[pipesIndex].direction == northEast &&
+		(*x > pipes[pipesIndex].x2 - particleWidth * cosine || *y < pipes[pipesIndex].y2 - particleWidth * sine)) ||
+		(pipes[pipesIndex].direction == southEast &&
+		(*x > pipes[pipesIndex].x2 - particleWidth * cosine || *y > pipes[pipesIndex].y2 - particleWidth * sine)) ||
+		(pipes[pipesIndex].direction == southWest &&
+		(*x < pipes[pipesIndex].x2 - particleWidth * cosine || *y > pipes[pipesIndex].y2 - particleWidth * sine)) ||
+		(pipes[pipesIndex].direction == northWest &&
+		(*x < pipes[pipesIndex].x2 - particleWidth * cosine || *y < pipes[pipesIndex].y2 - particleWidth * sine)))
+	{
+		*x = particles[pipesIndex].particle[particles[pipesIndex].firstIndex].x + (margin + particleWidth) * cosine;
+		*y = particles[pipesIndex].particle[particles[pipesIndex].firstIndex].y + (margin + particleWidth) * sine;
+		particles[pipesIndex].firstIndex = currentParticleIndex;
 	}
 }
 
@@ -343,7 +365,7 @@ static void paintParticles(Gdiplus::Graphics *graphics)
 	Gdiplus::Color circleColor(255, 255, 0, 0);
 	Gdiplus::SolidBrush solidBrush(circleColor);
 	float particleWidth = pipeWidth;
-	for (int i = 0; i < pipesLength; ++i)
+	for (int i = 0; i < particlesLength; ++i)
 	{
 		float dx, dy;
 		setDxDy(&dx, &dy, pipes[i].direction, pipes[i].theta);
@@ -352,7 +374,11 @@ static void paintParticles(Gdiplus::Graphics *graphics)
 			Particle *particle = &particles[i].particle[j];
 			particle->x += dx;
 			particle->y += dy;
-			setParticleInRange(&particle->x, &particle->y, i);
+		}
+		for (int j = particles[i].particleLength - 1; j >= 0; --j)
+		{
+			Particle *particle = &particles[i].particle[j];
+			setParticleInRange(&particle->x, &particle->y, i, j);
 
 			graphics->TranslateTransform(particle->x, particle->y);
 			graphics->RotateTransform(pipes[i].theta * 180.0f / M_PI);
@@ -378,5 +404,5 @@ void paint(HDC hdc)
 	paintPipes(&graphics);
 	paintParticles(&graphics);
 	graphics.EndContainer(graphicsContainer);
-	paintRandomStuff(&graphics);
+	//paintRandomStuff(&graphics);
 }
