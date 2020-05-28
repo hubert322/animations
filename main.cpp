@@ -40,7 +40,7 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, PSTR, INT iCmdShow)
 		hInstance,                // program instance handle
 		NULL);                    // creation parameters
 
-	SetTimer(hWnd, 1, 150, NULL);
+	//SetTimer(hWnd, 1, 150, NULL);
 
 	ShowWindow(hWnd, iCmdShow);
 	UpdateWindow(hWnd);

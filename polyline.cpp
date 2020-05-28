@@ -232,26 +232,29 @@ static Gdiplus::Point* getPolyPoints(directionEnum direction, float x1, float y1
 	return polyPoints;
 }
 
-static void paintMainShape(Gdiplus::Graphics *graphics)
+static void paintPipes(Gdiplus::Graphics *graphics)
 {
 	const Gdiplus::Color penColor(255, 0, 0, 255);
 	Gdiplus::Pen pen(penColor, pipeWidth);
-	graphics->ResetClip();
-	Gdiplus::GraphicsPath path;
+	Gdiplus::GraphicsPath pipesPath;
+	Gdiplus::GraphicsPath clippingPath;
 
+	pen.SetLineJoin(Gdiplus::LineJoinRound);
+	graphics->ResetClip();
 	for (int i = 0; i < pipesLength; ++i)
 	{
 		float x1 = pipes[i].x1;
 		float y1 = pipes[i].y1;
 		float x2 = pipes[i].x2;
 		float y2 = pipes[i].y2;
-		graphics->DrawLine(&pen, x1, y1, x2, y2);
+		pipesPath.AddLine(x1, y1, x2, y2);
 
 		Gdiplus::Point *polyPoints = getPolyPoints(pipes[i].direction, x1, y1, x2, y2, pipes[i].theta);
-		path.AddPolygon(polyPoints, 4);
+		clippingPath.AddPolygon(polyPoints, 4);
 		delete polyPoints;
 	}
-	Gdiplus::Region region(&path);
+	graphics->DrawPath(&pen, &pipesPath);
+	Gdiplus::Region region(&clippingPath);
 	graphics->SetClip(&region);
 	//Gdiplus::Pen pen2(Gdiplus::Color(255, 0, 255, 0));
 	//graphics->DrawPath(&pen2, &path);
@@ -372,7 +375,7 @@ void paint(HDC hdc)
 	graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	Gdiplus::GraphicsContainer graphicsContainer;
 	graphicsContainer = graphics.BeginContainer();
-	paintMainShape(&graphics);
+	paintPipes(&graphics);
 	paintParticles(&graphics);
 	graphics.EndContainer(graphicsContainer);
 	paintRandomStuff(&graphics);
