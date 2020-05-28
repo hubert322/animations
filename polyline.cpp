@@ -232,11 +232,11 @@ static Gdiplus::Point* getPolyPoints(directionEnum direction, float x1, float y1
 	return polyPoints;
 }
 
-static void paintMainShape(Gdiplus::Graphics &graphics)
+static void paintMainShape(Gdiplus::Graphics *graphics)
 {
 	const Gdiplus::Color penColor(255, 0, 0, 255);
 	Gdiplus::Pen pen(penColor, pipeWidth);
-	graphics.ResetClip();
+	graphics->ResetClip();
 	Gdiplus::GraphicsPath path;
 
 	for (int i = 0; i < pipesLength; ++i)
@@ -245,16 +245,16 @@ static void paintMainShape(Gdiplus::Graphics &graphics)
 		float y1 = pipes[i].y1;
 		float x2 = pipes[i].x2;
 		float y2 = pipes[i].y2;
-		graphics.DrawLine(&pen, x1, y1, x2, y2);
+		graphics->DrawLine(&pen, x1, y1, x2, y2);
 
 		Gdiplus::Point *polyPoints = getPolyPoints(pipes[i].direction, x1, y1, x2, y2, pipes[i].theta);
 		path.AddPolygon(polyPoints, 4);
 		delete polyPoints;
 	}
 	Gdiplus::Region region(&path);
-	graphics.SetClip(&region);
+	graphics->SetClip(&region);
 	//Gdiplus::Pen pen2(Gdiplus::Color(255, 0, 255, 0));
-	//graphics.DrawPath(&pen2, &path);
+	//graphics->DrawPath(&pen2, &path);
 }
 
 static void setDxDy(float *dx, float *dy, directionEnum direction, float theta)
@@ -335,7 +335,7 @@ static void setParticleInRange(float *x, float *y, int pipesIndex)
 	}
 }
 
-static void paintParticles(Gdiplus::Graphics &graphics)
+static void paintParticles(Gdiplus::Graphics *graphics)
 {
 	Gdiplus::Color circleColor(255, 255, 0, 0);
 	Gdiplus::SolidBrush solidBrush(circleColor);
@@ -351,18 +351,29 @@ static void paintParticles(Gdiplus::Graphics &graphics)
 			particle->y += dy;
 			setParticleInRange(&particle->x, &particle->y, i);
 
-			graphics.TranslateTransform(particle->x, particle->y);
-			graphics.RotateTransform(pipes[i].theta * 180.0f / M_PI);
-			graphics.TranslateTransform(-1 * particle->x + particle->translateX, -1 * particle->y + particle->translateY);
-			graphics.FillRectangle(&solidBrush, particle->x, particle->y, particleWidth, particleWidth);
-			graphics.ResetTransform();
+			graphics->TranslateTransform(particle->x, particle->y);
+			graphics->RotateTransform(pipes[i].theta * 180.0f / M_PI);
+			graphics->TranslateTransform(-1 * particle->x + particle->translateX, -1 * particle->y + particle->translateY);
+			graphics->FillRectangle(&solidBrush, particle->x, particle->y, particleWidth, particleWidth);
+			graphics->ResetTransform();
 		}
 	}
+}
+
+static void paintRandomStuff(Gdiplus::Graphics *graphics)
+{
+	Gdiplus::SolidBrush solidBrush(Gdiplus::Color(255, 0, 255, 0));
+	graphics->FillEllipse(&solidBrush, 70, 70, 100, 100);
 }
 
 void paint(HDC hdc)
 {
 	Gdiplus::Graphics graphics(hdc);
-	paintMainShape(graphics);
-	paintParticles(graphics);
+	graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	Gdiplus::GraphicsContainer graphicsContainer;
+	graphicsContainer = graphics.BeginContainer();
+	paintMainShape(&graphics);
+	paintParticles(&graphics);
+	graphics.EndContainer(graphicsContainer);
+	paintRandomStuff(&graphics);
 }
