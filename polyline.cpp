@@ -44,7 +44,7 @@ ParticleArray *particles;
 int particlesLength;
 const float pipeWidth = 10.0f;
 const float margin = 20.0f;
-const float particleWidth = 10.0f;
+const float particleWidth = 6.0f;
 const float velocity = 5;
 
 void gdiplusStartup()
@@ -143,7 +143,7 @@ static void initParticles()
 			float translateX = 0;
 			float translateY = 0;
 			float mainAxisDiff = j == 0 ? -1 * (margin + particleWidth)  : (margin + particleWidth) * (j - 1) + particleWidth;
-			float crossAxisDiff = pipeWidth / 2.0f;
+			float crossAxisDiff = particleWidth / 2.0f;
 
 			if (pipes[i].direction == north || pipes[i].direction == south)
 			{
@@ -277,8 +277,8 @@ static void paintPipes(Gdiplus::Graphics *graphics)
 	graphics->DrawPath(&pen, &pipesPath);
 	Gdiplus::Region region(&clippingPath);
 	graphics->SetClip(&region);
-	Gdiplus::Pen pen2(Gdiplus::Color(255, 0, 255, 0));
-	graphics->DrawPath(&pen2, &clippingPath);
+	//Gdiplus::Pen pen2(Gdiplus::Color(255, 0, 255, 0));
+	//graphics->DrawPath(&pen2, &clippingPath);
 }
 
 static void setDxDy(float *dx, float *dy, directionEnum direction, float theta)
@@ -364,7 +364,6 @@ static void paintParticles(Gdiplus::Graphics *graphics)
 {
 	Gdiplus::Color circleColor(255, 255, 0, 0);
 	Gdiplus::SolidBrush solidBrush(circleColor);
-	float particleWidth = pipeWidth;
 	for (int i = 0; i < particlesLength; ++i)
 	{
 		float dx, dy;
@@ -402,6 +401,7 @@ void paint(HDC hdc)
 	Gdiplus::GraphicsContainer graphicsContainer;
 	graphicsContainer = graphics.BeginContainer();
 	paintPipes(&graphics);
+	//graphics.SetClip(&graphics);
 	paintParticles(&graphics);
 	graphics.EndContainer(graphicsContainer);
 	//paintRandomStuff(&graphics);
