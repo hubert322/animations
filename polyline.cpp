@@ -34,13 +34,16 @@ struct ParticleArray
 	Particle *particle;
 	int particleLength;
 };
+
 Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 ULONG_PTR gdiplusToken;
 Pipe *pipes;
 int pipesLength;
 ParticleArray *particles;
 int particlesLength;
-const int pipeWidth = 10;
+const float pipeWidth = 10.0f;
+const float margin = 20.0f;
+const float particleWidth = 10.0f;
 const float velocity = 10;
 
 void gdiplusStartup()
@@ -127,9 +130,7 @@ static void initParticles()
 	particlesLength = pipesLength;
 	for (int i = 0; i < pipesLength; ++i)
 	{
-		float margin = 20.0f;
 		int numParticles = hypot(fabsf(pipes[i].x1 - pipes[i].x2), fabsf(pipes[i].y1 - pipes[i].y2)) / (pipeWidth + margin) + 2;
-		float particleSize = pipeWidth;
 
 		particles[i].particle = (Particle *)malloc(sizeof(Particle) * numParticles);
 		particles[i].particleLength = numParticles;
@@ -166,12 +167,12 @@ static void initParticles()
 				y -= dy;
 				if (pipes[i].direction == northWest || pipes[i].direction == southEast)
 				{
-					translateX = particleSize / 2;
-					translateY = particleSize / 2 * -1;
+					translateX = particleWidth / 2;
+					translateY = particleWidth / 2 * -1;
 				}
 				else if (pipes[i].direction == northEast || pipes[i].direction == southWest)
 				{
-					translateX = translateY = particleSize / 2 * -1;
+					translateX = translateY = particleWidth / 2 * -1;
 				}
 			}
 			particles[i].particle[j] = { x, y, translateX, translateY };
@@ -219,7 +220,10 @@ static Gdiplus::Point* getPolyPoints(directionEnum direction, float x1, float y1
 		polyPoints[2] = { (int)ceil(x2), (int)ceil(y2 + pipeWidth / 2.0) };
 		polyPoints[3] = { (int)ceil(x2), (int)ceil(y2 - pipeWidth / 2.0) };
 		break;
-	default:
+	case northEast:
+	case southEast:
+	case southWest:
+	case northWest:
 		polyPoints[0] = { (int)ceil(x1 + cos(theta) * pipeWidth / 2.0), (int)ceil(y1 - sin(theta) * pipeWidth / 2.0) };
 		polyPoints[1] = { (int)ceil(x1 - cos(theta) * pipeWidth / 2.0), (int)ceil(y1 + sin(theta) * pipeWidth / 2.0) };
 		polyPoints[2] = { (int)ceil(x2 - cos(theta) * pipeWidth / 2.0), (int)ceil(y2 + sin(theta) * pipeWidth / 2.0) };
@@ -241,12 +245,11 @@ static void paintMainShape(Gdiplus::Graphics &graphics)
 		float y1 = pipes[i].y1;
 		float x2 = pipes[i].x2;
 		float y2 = pipes[i].y2;
+		graphics.DrawLine(&pen, x1, y1, x2, y2);
 
 		Gdiplus::Point *polyPoints = getPolyPoints(pipes[i].direction, x1, y1, x2, y2, pipes[i].theta);
 		path.AddPolygon(polyPoints, 4);
 		delete polyPoints;
-
-		graphics.DrawLine(&pen, x1, y1, x2, y2);
 	}
 	Gdiplus::Region region(&path);
 	graphics.SetClip(&region);
@@ -254,52 +257,79 @@ static void paintMainShape(Gdiplus::Graphics &graphics)
 	//graphics.DrawPath(&pen2, &path);
 }
 
+static void setDxDy(float *dx, float *dy, directionEnum direction, float theta)
+{
+	*dx = 0;
+	*dy = 0;
+	switch (direction)
+	{
+	case north:
+		*dy -= velocity;
+		break;
+	case east:
+		*dx += velocity;
+		break;
+	case south:
+		*dy += velocity;
+		break;
+	case west:
+		*dx -= velocity;
+		break;
+	case northEast:
+	case southEast:
+	case southWest:
+	case northWest:
+		*dx -= velocity * cos(theta);
+		*dy -= velocity * sin(theta);
+		break;
+	}
+}
+
 static void setParticleInRange(float *x, float *y, int pipesIndex)
 {
-	float marginAndParticleSize = 30;
 	switch (pipes[pipesIndex].direction)
 	{
 	case north:
-		if (*y < pipes[pipesIndex].y2 - marginAndParticleSize)
+		if (*y < pipes[pipesIndex].y2 - margin - particleWidth)
 			*y = pipes[pipesIndex].y1;
 		break;
 	case northEast:
-		if (*x > pipes[pipesIndex].x2 + marginAndParticleSize || *y < pipes[pipesIndex].y2 - marginAndParticleSize)
+		if (*x > pipes[pipesIndex].x2 + margin - particleWidth || *y < pipes[pipesIndex].y2 - margin - particleWidth)
 		{
-			*x = pipes[pipesIndex].x1 + 20.0f * cos(pipes[pipesIndex].theta);
-			*y = pipes[pipesIndex].y1 + 20.0f * sin(pipes[pipesIndex].theta);
+			*x = pipes[pipesIndex].x1 + margin * cos(pipes[pipesIndex].theta);
+			*y = pipes[pipesIndex].y1 + margin * sin(pipes[pipesIndex].theta);
 		}
 		break;
 	case east:
-		if (*x > pipes[pipesIndex].x2 + marginAndParticleSize)
+		if (*x > pipes[pipesIndex].x2 + margin + particleWidth)
 			*x = pipes[pipesIndex].x1;
 		break;
 	case southEast:
-		if (*x > pipes[pipesIndex].x2 + marginAndParticleSize || *y > pipes[pipesIndex].y2 + marginAndParticleSize)
+		if (*x > pipes[pipesIndex].x2 + margin + particleWidth || *y > pipes[pipesIndex].y2 + margin + particleWidth)
 		{
-			*x = pipes[pipesIndex].x1 + 20.0f * cos(pipes[pipesIndex].theta);
-			*y = pipes[pipesIndex].y1 + 20.0f * sin(pipes[pipesIndex].theta);
+			*x = pipes[pipesIndex].x1 + margin * cos(pipes[pipesIndex].theta);
+			*y = pipes[pipesIndex].y1 + margin * sin(pipes[pipesIndex].theta);
 		}
 	case south:
-		if (*y > pipes[pipesIndex].y2 + marginAndParticleSize)
+		if (*y > pipes[pipesIndex].y2 + margin + particleWidth)
 			*y = pipes[pipesIndex].y1;
 		break;
 	case southWest:
-		if (*x < pipes[pipesIndex].x2 - marginAndParticleSize || *y > pipes[pipesIndex].y2 + marginAndParticleSize)
+		if (*x < pipes[pipesIndex].x2 - margin - particleWidth || *y > pipes[pipesIndex].y2 + margin + particleWidth)
 		{
-			*x = pipes[pipesIndex].x1 + 20.0f * cos(pipes[pipesIndex].theta);
-			*y = pipes[pipesIndex].y1 + 20.0f * sin(pipes[pipesIndex].theta);
+			*x = pipes[pipesIndex].x1 + margin * cos(pipes[pipesIndex].theta);
+			*y = pipes[pipesIndex].y1 + margin * sin(pipes[pipesIndex].theta);
 		}
 		break;
 	case west:
-		if (*x < pipes[pipesIndex].x2 - marginAndParticleSize)
+		if (*x < pipes[pipesIndex].x2 - margin - particleWidth)
 			*x = pipes[pipesIndex].x1;
 		break;
 	case northWest:
-		if (*x < pipes[pipesIndex].x2 - marginAndParticleSize || *y < pipes[pipesIndex].y2 - marginAndParticleSize)
+		if (*x < pipes[pipesIndex].x2 - margin - particleWidth || *y < pipes[pipesIndex].y2 - margin - particleWidth)
 		{
-			*x = pipes[pipesIndex].x1 + 20.0f * cos(pipes[pipesIndex].theta);
-			*y = pipes[pipesIndex].y1 + 20.0f * sin(pipes[pipesIndex].theta);
+			*x = pipes[pipesIndex].x1 + margin * cos(pipes[pipesIndex].theta);
+			*y = pipes[pipesIndex].y1 + margin * sin(pipes[pipesIndex].theta);
 		}
 		break;
 	}
@@ -309,43 +339,11 @@ static void paintParticles(Gdiplus::Graphics &graphics)
 {
 	Gdiplus::Color circleColor(255, 255, 0, 0);
 	Gdiplus::SolidBrush solidBrush(circleColor);
-	float particleSize = pipeWidth;
+	float particleWidth = pipeWidth;
 	for (int i = 0; i < pipesLength; ++i)
 	{
-		float dx = 0;
-		float dy = 0;
-		switch (pipes[i].direction)
-		{
-		case north:
-			dy -= velocity;
-			break;
-		case northEast:
-			dx -= velocity * cos(pipes[i].theta);
-			dy -= velocity * sin(pipes[i].theta);
-			break;
-		case east:
-			dx += velocity;
-			break;
-		case southEast:
-			dx -= velocity * cos(pipes[i].theta);
-			dy -= velocity * sin(pipes[i].theta);
-			break;
-		case south:
-			dy += velocity;
-			break;
-		case southWest:
-			dx -= velocity * cos(pipes[i].theta);
-			dy -= velocity * sin(pipes[i].theta);
-			break;
-		case west:
-			dx -= velocity;
-			break;
-		case northWest:
-			dx -= velocity * cos(pipes[i].theta);
-			dy -= velocity * sin(pipes[i].theta);
-			break;
-		}
-
+		float dx, dy;
+		setDxDy(&dx, &dy, pipes[i].direction, pipes[i].theta);
 		for (int j = 0; j < particles[i].particleLength; ++j)
 		{
 			Particle *particle = &particles[i].particle[j];
@@ -356,7 +354,7 @@ static void paintParticles(Gdiplus::Graphics &graphics)
 			graphics.TranslateTransform(particle->x, particle->y);
 			graphics.RotateTransform(pipes[i].theta * 180.0f / M_PI);
 			graphics.TranslateTransform(-1 * particle->x + particle->translateX, -1 * particle->y + particle->translateY);
-			graphics.FillRectangle(&solidBrush, particle->x, particle->y, particleSize, particleSize);
+			graphics.FillRectangle(&solidBrush, particle->x, particle->y, particleWidth, particleWidth);
 			graphics.ResetTransform();
 		}
 	}
