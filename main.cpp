@@ -10,8 +10,7 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, PSTR, INT iCmdShow)
 	MSG                 msg;
 	WNDCLASS            wndClass;
 
-	// Initialize GDI+.
-	gdiplusStartup();
+	// Initialize GDI+.	gdiplusStartup();
 	initPaint();
 
 	wndClass.style = CS_HREDRAW | CS_VREDRAW;

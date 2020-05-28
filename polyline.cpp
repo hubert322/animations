@@ -13,22 +13,21 @@ enum directionEnum
 	west,
 	northWest
 };
-//struct Pipe
-//{
-//	float x1;
-//	float y1;
-//	float x2;
-//	float y2;
-//	float 
-//};
+struct Pipe
+{
+	float x1;
+	float y1;
+	float x2;
+	float y2;
+	float theta;
+	directionEnum direction;
+};
 struct Particle
 {
 	float x;
 	float y;
 	float translateX;
 	float translateY;
-	float theta;
-	directionEnum direction;
 };
 struct ParticleArray
 {
@@ -39,8 +38,8 @@ Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 ULONG_PTR gdiplusToken;
 ParticleArray *particles;
 int particlesLength;
-Gdiplus::Point points[7];
-const int pointsLength = 7;
+Pipe pipes[6];
+const int pipesLength = 6;
 const int mainShapePenWidth = 10;
 const float velocity = 10;
 
@@ -56,112 +55,151 @@ void gdiplusShutdown()
 
 static void initMainShape()
 {
-	points[0] = { 300, 100 };
-	points[1] = { 100, 100 };
-	points[2] = { 100, 400 };
-	points[3] = { 300, 400 };
-	points[4] = { 150, 170 };
-	points[5] = { 270, 170 };
-	points[6] = { 150, 370 };
+	float tmp[7][2] = {
+		{300.0f, 100.0f},
+		{100.0f, 100.0f},
+		{100.0f, 400.0f},
+		{300.0f, 400.0f},
+		{150.0f, 170.0f},
+		{270.0f, 170.0f},
+		{150.0f, 370.0f}
+	};
+
+	for (int i = 0; i < pipesLength; ++i)
+	{
+		float theta = 0;
+		directionEnum direction;
+		//! horizontal
+		if (tmp[i][1] == tmp[i + 1][1])
+		{
+			//! west
+			if (tmp[i][0] > tmp[i + 1][0])
+			{
+				direction = west;
+			}
+			//! east
+			else
+			{
+				direction = east;
+			}
+		}
+		//! vertical
+		else if (tmp[i][0] == tmp[i + 1][0])
+		{
+			//! north
+			if (tmp[i][1] > tmp[i + 1][1])
+			{
+				direction = north;
+			}
+			//! south
+			else
+			{
+				direction = south;
+			}
+		}
+		//! diagonal
+		else
+		{
+			float dx = tmp[i][0] - tmp[i + 1][0];
+			float dy = tmp[i][1] - tmp[i + 1][1];
+			theta = atan2(dy, dx);
+
+			//! bottom right to top left
+			if (tmp[i][0] > tmp[i + 1][0] && tmp[i][1] > tmp[i + 1][1])
+			{
+				direction = northWest;
+			}
+			//! bottom left to top right
+			else if (tmp[i][0] < tmp[i + 1][0] && tmp[i][1] > tmp[i + 1][1])
+			{
+				direction = northEast;
+			}
+			//! top right to bottom left
+			else if (tmp[i][0] > tmp[i + 1][0] && tmp[i][1] < tmp[i + 1][1])
+			{
+				direction = southWest;
+			}
+			//! top left to bottom right
+			else
+			{
+				direction = southEast;
+			}
+		}
+		pipes[i] = { tmp[i][0], tmp[i][1], tmp[i + 1][0], tmp[i + 1][1], theta, direction };
+	}
 }
 
 static void initParticles()
 {
-	particles = (ParticleArray *)malloc(sizeof(ParticleArray) * (pointsLength - 1));
-	particlesLength = pointsLength - 1;
-	for (int i = 0; i < pointsLength - 1; ++i)
+	particles = (ParticleArray *)malloc(sizeof(ParticleArray) * (pipesLength - 1));
+	particlesLength = pipesLength;
+	for (int i = 0; i < pipesLength; ++i)
 	{
 		float margin = 20.0f;
-		int numParticles = hypot(abs(points[i].X - points[i + 1].X), abs(points[i].Y - points[i + 1].Y)) / (mainShapePenWidth + margin) + 2;
+		int numParticles = hypot(fabsf(pipes[i].x1 - pipes[i].x2), fabsf(pipes[i].y1 - pipes[i].y2)) / (mainShapePenWidth + margin) + 2;
 		float particleSize = mainShapePenWidth;
 
 		particles[i].particle = (Particle *)malloc(sizeof(Particle) * numParticles);
 		particles[i].particleLength = numParticles;
 		for (int j = 0; j < numParticles; ++j)
 		{
-			float x = points[i].X;
-			float y = points[i].Y;
+			float x = pipes[i].x1;
+			float y = pipes[i].y1;
 			float translateX = 0;
 			float translateY = 0;
-			float theta = 0;
 			float mainAxisDiff = (margin + mainShapePenWidth) * (j) - margin;
 			float crossAxisDiff = mainShapePenWidth / 2.0f;
-			directionEnum direction;
-			if (points[i].Y == points[i + 1].Y)
-			{
-				y -= crossAxisDiff;
-				if (points[i].X > points[i + 1].X)
-				{
-					x -= mainAxisDiff;
-					direction = west;
-				}
-				else
-				{
-					x += mainAxisDiff;
-					direction = east;
-				}
-			}
-			else if (points[i].X == points[i + 1].X)
+
+			if (pipes[i].direction == north || pipes[i].direction == south)
 			{
 				x -= crossAxisDiff;
-				if (points[i].Y > points[i + 1].Y)
-				{
+				if (pipes[i].direction == north)
 					y -= mainAxisDiff;
-					direction = north;
-				}
 				else
-				{
 					y += mainAxisDiff;
-					direction = south;
-				}
+			}
+			else if (pipes[i].direction == east || pipes[i].direction == west)
+			{
+				y -= crossAxisDiff;
+				if (pipes[i].direction == west)
+					x -= mainAxisDiff;
+				else
+					x += mainAxisDiff;
 			}
 			else
 			{
-				float dx = abs(points[i].X - points[i + 1].X);
-				float dy = abs(points[i].Y - points[i + 1].Y);
-
-				theta = atan2(dy, dx);
-				float xVal = mainAxisDiff * cos(theta);
-				float yVal = mainAxisDiff * sin(theta);
+				float dx = mainAxisDiff * cos(pipes[i].theta);
+				float dy = mainAxisDiff * sin(pipes[i].theta);
 
 				// bottom right to top left
-				if (points[i].X > points[i + 1].X &&points[i].Y > points[i + 1].Y)
+				if (pipes[i].direction == northWest)
 				{
-					x -= xVal;
-					y -= yVal;
+					x -= dx;
+					y -= dy;
 					translateX = particleSize / 2;
 					translateY = particleSize / 2 * -1;
-					direction = northWest;
 				}
 				// bottom left to top right
-				else if (points[i].X < points[i + 1].X && points[i].Y > points[i + 1].Y)
+				else if (pipes[i].direction == northEast)
 				{
-					x += xVal;
-					y -= yVal;
-					direction = northEast;
+					x += dx;
+					y -= dy;
 				}
 				// top right to bottom left
-				else if (points[i].X > points[i + 1].X &&points[i].Y < points[i + 1].Y)
+				else if (pipes[i].direction == southWest)
 				{
-					x -= xVal;
-					y += yVal;
+					x -= dx;
+					y += dy;
 					translateX = translateY = particleSize / 2 * -1;
-					direction = southWest;
 				}
 				// top left to bottom right
 				else
 				{
-					x += xVal;
-					y += yVal;
-					direction = southEast;
-				}
-
-				if (points[i].Y < points[i + 1].Y)
-				{
-					theta *= -1;
+					x += dx;
+					y += dy;
 				}
 			}
-			particles[i].particle[j] = { x, y, translateX, translateY, theta, direction };
+			particles[i].particle[j] = { x, y, translateX, translateY };
 		}
 	}
 }
@@ -177,13 +215,51 @@ static void paintMainShape(Gdiplus::Graphics &graphics)
 	const Gdiplus::Color penColor(255, 0, 0, 255);
 	Gdiplus::Pen pen(penColor, mainShapePenWidth);
 
-	for (int i = 0; i < pointsLength - 1; ++i)
+	for (int i = 0; i < pipesLength; ++i)
 	{
-		int x1 = points[i].X;
-		int y1 = points[i].Y;
-		int x2 = points[i + 1].X;
-		int y2 = points[i + 1].Y;
+		int x1 = pipes[i].x1;
+		int y1 = pipes[i].y1;
+		int x2 = pipes[i].x2;
+		int y2 = pipes[i].y2;
 		graphics.DrawLine(&pen, x1, y1, x2, y2);
+	}
+}
+
+static void setParticleInRange(float *x, float *y, int pipesIndex)
+{
+	float marginAndParticleSize = 30;
+	switch (pipes[pipesIndex].direction)
+	{
+	case north:
+		if (*y < pipes[pipesIndex].y2 - marginAndParticleSize)
+			*y = pipes[pipesIndex].y1;
+		break;
+	case northEast:
+		break;
+	case east:
+		if (*x > pipes[pipesIndex].x2 + marginAndParticleSize)
+			*x = pipes[pipesIndex].x1;
+		break;
+	case south:
+		if (*y > pipes[pipesIndex].y2 + marginAndParticleSize)
+			*y = pipes[pipesIndex].y1;
+		break;
+	case southWest:
+		if (*x < pipes[pipesIndex].x2 - marginAndParticleSize)
+			*x = pipes[pipesIndex].x1;
+		if (*y > pipes[pipesIndex].y2 + marginAndParticleSize)
+			*y = pipes[pipesIndex].y1;
+		break;
+	case west:
+		if (*x < pipes[pipesIndex].x2 - marginAndParticleSize)
+			*x = pipes[pipesIndex].x1;
+		break;
+	case northWest:
+		if (*x < pipes[pipesIndex].x2 - marginAndParticleSize)
+			*x = pipes[pipesIndex].x1;
+		if (*y < pipes[pipesIndex].y2 - marginAndParticleSize)
+			*y = pipes[pipesIndex].y1;
+		break;
 	}
 }
 
@@ -193,28 +269,29 @@ static void paintParticles(Gdiplus::Graphics &graphics)
 	Gdiplus::SolidBrush solidBrush(circleColor);
 	float particleSize = mainShapePenWidth;
 
-	graphics.ResetClip();
-	Gdiplus::Point polyPoints[4] = {
-		{ 300, 95 },
-		{ 100, 95 },
-		{ 100, 105 },
-		{ 300, 105 }
-	};
-	Gdiplus::GraphicsPath path;
-	path.AddPolygon(polyPoints, 4);
 
-	Gdiplus::Point polyPoints2[4] = {
-		{ 95, 100 },
-		{ 95, 400 },
-		{ 105, 400 },
-		{ 105, 100 }
-	};
-	path.AddPolygon(polyPoints2, 4);
+	//graphics.ResetClip();
+	//Gdiplus::Point polyPoints[4] = {
+	//	{ 300, 95 },
+	//	{ 100, 95 },
+	//	{ 100, 105 },
+	//	{ 300, 105 }
+	//};
+	//Gdiplus::GraphicsPath path;
+	//path.AddPolygon(polyPoints, 4);
 
-	Gdiplus::Region region(&path);
-	graphics.SetClip(&region);
-	Gdiplus::Pen pen(Gdiplus::Color(255, 0, 255, 0));
-	graphics.DrawPath(&pen, &path);
+	//Gdiplus::Point polyPoints2[4] = {
+	//	{ 95, 100 },
+	//	{ 95, 400 },
+	//	{ 105, 400 },
+	//	{ 105, 100 }
+	//};
+	//path.AddPolygon(polyPoints2, 4);
+
+	//Gdiplus::Region region(&path);
+	//graphics.SetClip(&region);
+	//Gdiplus::Pen pen(Gdiplus::Color(255, 0, 255, 0));
+	//graphics.DrawPath(&pen, &path);
 
 	for (int i = 0; i < particlesLength; ++i)
 	{
@@ -265,57 +342,45 @@ static void paintParticles(Gdiplus::Graphics &graphics)
 		//case northWest:
 		//	break;
 		//}
+		float dx = 0;
+		float dy = 0;
+		switch (pipes[i].direction)
+		{
+		case north:
+			dy -= velocity;
+			break;
+		case northEast:
+			break;
+		case east:
+			dx += velocity;
+			break;
+		case south:
+			dy += velocity;
+			break;
+		case southWest:
+			dx -= velocity * cos(pipes[i].theta);
+			dy += velocity * sin(pipes[i].theta);
+			break;
+		case west:
+			dx -= velocity;
+			break;
+		case northWest:
+			dx -= velocity * cos(pipes[i].theta);
+			dy -= velocity * sin(pipes[i].theta);
+			break;
+		}
 
 		for (int j = 0; j < particles[i].particleLength; ++j)
 		{
-			Particle &particle = particles[i].particle[j];
-			float &x = particle.x;
-			float &y = particle.y;
-			switch (particle.direction)
-			{
-			case north:
-				y -= velocity;
-				if (y < points[i + 1].Y - 30)
-					y = points[i].Y;
-				break;
-			case northEast:
-				break;
-			case east:
-				x += velocity;
-				if (x > points[i + 1].X + 30)
-					x = points[i].X;
-				break;
-			case south:
-				y += velocity;
-				if (y > points[i + 1].Y + 30)
-					y = points[i].Y;
-				break;
-			case southWest:
-				x -= velocity * cos(particle.theta * -1);
-				y += velocity * sin(particle.theta * -1);
-				if (x < points[i + 1].X - 30)
-					x = points[i].X;
-				if (y > points[i + 1].Y + 30)
-					y = points[i].Y;
-				break;
-			case west:
-				x -= velocity;
-				if (x < points[i + 1].X - 30)
-					x = points[i].X;
-				break;
-			case northWest:
-				x -= velocity * cos(particle.theta);
-				y -= velocity * sin(particle.theta);
-				if (x < points[i + 1].X - 30)
-					x = points[i].X;
-				if (y < points[i + 1].Y - 30)
-					y = points[i].Y;
-				break;
-			}
-			graphics.TranslateTransform(x, y);
-			graphics.RotateTransform(particle.theta * 180.0f / M_PI);
-			graphics.TranslateTransform(-x + particle.translateX, -y + particle.translateY);
-			graphics.FillRectangle(&solidBrush, x, y, particleSize, particleSize);
+			Particle *particle = &particles[i].particle[j];
+			particle->x += dx;
+			particle->y += dy;
+			setParticleInRange(&particle->x, &particle->y, i);
+
+			graphics.TranslateTransform(particle->x, particle->y);
+			graphics.RotateTransform(pipes[i].theta * 180.0f / M_PI);
+			graphics.TranslateTransform(-1 * particle->x + particle->translateX, -1 * particle->y + particle->translateY);
+			graphics.FillRectangle(&solidBrush, particle->x, particle->y, particleSize, particleSize);
 			graphics.ResetTransform();
 		}
 	}
@@ -326,5 +391,5 @@ void paint(HDC hdc)
 	Gdiplus::Graphics graphics(hdc);
 	const int mainShapePenWidth = 10;
 	paintMainShape(graphics);
-	paintParticles(graphics);
+	//paintParticles(graphics);
 }
