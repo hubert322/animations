@@ -21,6 +21,7 @@ struct Pipe
 	float y2;
 	float theta;
 	directionEnum direction;
+	float pipeLength;
 };
 struct Particle
 {
@@ -39,13 +40,25 @@ struct ParticleArray
 Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 ULONG_PTR gdiplusToken;
 Pipe *pipes;
-int pipesLength;
+int pipesArrSize;
 ParticleArray *particles;
-int particlesLength;
+int particlesArrSize;
+
 const float pipeWidth = 10.0f;
-const float margin = 20.0f;
+const Gdiplus::Color pipeColor(255, 0, 0, 255);
+
+const float margin = 10.0f;
 const float particleWidth = 6.0f;
-const float velocity = 5;
+const float particleWidthMargin = (pipeWidth - particleWidth) / 2;
+const float velocity = 0;
+
+const float dashWidth = 6.0f;
+const Gdiplus::Color dashColor(255, 255, 0, 0);
+const int dashLength = 5;
+const int spaceLength = 3;
+const float dashArray[2] = { dashLength, spaceLength };
+const int dashOffsetMax = dashLength + spaceLength;
+int dashOffset = 0;
 
 int pipesTotalLength;
 
@@ -61,9 +74,9 @@ void gdiplusShutdown()
 
 static void initPipes(float **points, int pointsLength)
 {
-	pipesLength = pointsLength - 1;
-	pipes = (Pipe *)malloc(sizeof(Pipe) * pipesLength);
-	for (int i = 0; i < pipesLength; ++i)
+	pipesArrSize = pointsLength - 1;
+	pipes = (Pipe *)malloc(sizeof(Pipe) * pipesArrSize);
+	for (int i = 0; i < pipesArrSize; ++i)
 	{
 		float theta = 0;
 		directionEnum direction;
@@ -123,18 +136,23 @@ static void initPipes(float **points, int pointsLength)
 				direction = southEast;
 			}
 		}
-		pipes[i] = { points[i][0], points[i][1], points[i + 1][0], points[i + 1][1], theta, direction };
+		float pipeLength = hypot(fabsf(pipes[i].x1 - pipes[i].x2), fabs(pipes[i].y1 - pipes[i].y2));
+		pipes[i] = { points[i][0], points[i][1], points[i + 1][0], points[i + 1][1], theta, direction, pipeLength };
+		pipesTotalLength += pipeLength;
 	}
 }
 
 static void initParticles()
 {
-	particles = (ParticleArray *)malloc(sizeof(ParticleArray) * (pipesLength - 1));
-	particlesLength = pipesLength;
-	for (int i = 0; i < pipesLength; ++i)
-	{
-		int numParticles = hypot(fabsf(pipes[i].x1 - pipes[i].x2), fabsf(pipes[i].y1 - pipes[i].y2)) / (pipeWidth + margin) + 2;
+	particles = (ParticleArray *)malloc(sizeof(ParticleArray) * (pipesArrSize - 1));
+	particlesArrSize = pipesArrSize;
 
+	float particleHeightMargin = margin;
+	float particleHeight = particleWidth;
+	int numParticles = (pipesTotalLength * pipeWidth) / ((2 * particleWidthMargin + particleWidth) * (2 * particleHeightMargin + particleHeight));
+	for (int i = 0; i < pipesArrSize; ++i)
+	{
+		//int numParticles = hypot(fabsf(pipes[i].x1 - pipes[i].x2), fabsf(pipes[i].y1 - pipes[i].y2)) / (pipeWidth + margin) + 2;
 		particles[i].particle = (Particle *)malloc(sizeof(Particle) * numParticles);
 		particles[i].particleLength = numParticles;
 		particles[i].firstIndex = 0;
@@ -144,7 +162,7 @@ static void initParticles()
 			float y = pipes[i].y1;
 			float translateX = 0;
 			float translateY = 0;
-			float mainAxisDiff = j == 0 ? -1 * (margin + particleWidth)  : (margin + particleWidth) * (j - 1) + particleWidth;
+			//float mainAxisDiff = j == 0 ? -1 * (margin + particleWidth)  : (margin + particleWidth) * (j - 1) + particleWidth;
 			float crossAxisDiff = particleWidth / 2.0f;
 
 			if (pipes[i].direction == north || pipes[i].direction == south)
@@ -221,7 +239,7 @@ void initPaint()
 	points[7][0] = 600.0f; points[7][1] = 500.0f;
 	points[8][0] = 500.0f; points[8][1] = 300.0f;
 	initPipes(points, pointsLength);
-	initParticles();
+	//initParticles();
 }
 
 static Gdiplus::Point* getPolyPoints(directionEnum direction, float x1, float y1, float x2, float y2, float theta)
@@ -255,7 +273,51 @@ static Gdiplus::Point* getPolyPoints(directionEnum direction, float x1, float y1
 	return polyPoints;
 }
 
-static void paintPipes(Gdiplus::Graphics *graphics)
+static float getOffsetDirection(directionEnum direction, float theta)
+{
+	return 1;
+	switch (direction)
+	{
+	case north:
+		return -1;
+	case east:
+		return 1;
+	case south:
+		return 1;
+	case west: -1;
+	case northEast:
+	case southEast:
+	case southWest:
+	case northWest:
+		return 1;
+	}
+}
+
+static void paintPipes(Gdiplus::Graphics *graphics, int dashDirection, float xOffset)
+{
+	Gdiplus::Pen pen(pipeColor, pipeWidth);
+	Gdiplus::GraphicsPath pipesPath;
+	pen.SetLineJoin(Gdiplus::LineJoinRound);
+	for (int i = 0; i < pipesArrSize; ++i)
+	{
+		float x1 = pipes[i].x1 + xOffset;
+		float y1 = pipes[i].y1;
+		float x2 = pipes[i].x2 + xOffset;
+		float y2 = pipes[i].y2;
+		pipesPath.AddLine(x1, y1, x2, y2);
+	}
+	graphics->DrawPath(&pen, &pipesPath);
+
+	//! Paint Dashes
+	pen.SetColor(dashColor);
+	pen.SetWidth(dashWidth);
+	pen.SetDashPattern(dashArray, 2);
+	pen.SetDashOffset(dashOffset * dashDirection);
+	graphics->DrawPath(&pen, &pipesPath);
+	dashOffset = (dashOffset + 1) % dashOffsetMax;
+}
+
+static void paintPipes2(Gdiplus::Graphics *graphics, int index, float dashOffset, float xOffset, float yOffset)
 {
 	const Gdiplus::Color penColor(255, 0, 0, 255);
 	Gdiplus::Pen pen(penColor, pipeWidth);
@@ -263,22 +325,23 @@ static void paintPipes(Gdiplus::Graphics *graphics)
 	Gdiplus::GraphicsPath clippingPath;
 
 	pen.SetLineJoin(Gdiplus::LineJoinRound);
-	graphics->ResetClip();
-	for (int i = 0; i < pipesLength; ++i)
-	{
-		float x1 = pipes[i].x1;
-		float y1 = pipes[i].y1;
-		float x2 = pipes[i].x2;
-		float y2 = pipes[i].y2;
-		pipesPath.AddLine(x1, y1, x2, y2);
+	const float dashArray[2] = { 5, 3 };
+	pen.SetDashPattern(dashArray, 2);
+	pen.SetDashOffset(dashOffset * getOffsetDirection(pipes[index].direction, pipes[index].theta));
 
-		Gdiplus::Point *polyPoints = getPolyPoints(pipes[i].direction, x1, y1, x2, y2, pipes[i].theta);
-		clippingPath.AddPolygon(polyPoints, 4);
-		delete polyPoints;
-	}
+	float x1 = pipes[index].x1 + xOffset;
+	float y1 = pipes[index].y1 + yOffset;
+	float x2 = pipes[index].x2 + xOffset;
+	float y2 = pipes[index].y2 + yOffset;
+	pipesPath.AddLine(x1, y1, x2, y2);
+
+	Gdiplus::Point *polyPoints = getPolyPoints(pipes[index].direction, x1, y1, x2, y2, pipes[index].theta);
+	clippingPath.AddPolygon(polyPoints, 4);
+	delete polyPoints;
+
 	graphics->DrawPath(&pen, &pipesPath);
-	Gdiplus::Region region(&clippingPath);
-	graphics->SetClip(&region);
+	//Gdiplus::Region region(&clippingPath);
+	//graphics->SetClip(&region);
 	Gdiplus::Pen pen2(Gdiplus::Color(255, 0, 255, 0));
 	graphics->DrawPath(&pen2, &clippingPath);
 }
@@ -366,7 +429,7 @@ static void paintParticles(Gdiplus::Graphics *graphics)
 {
 	Gdiplus::Color circleColor(255, 255, 0, 0);
 	Gdiplus::SolidBrush solidBrush(circleColor);
-	for (int i = 0; i < particlesLength; ++i)
+	for (int i = 0; i < particlesArrSize; ++i)
 	{
 		float dx, dy;
 		setDxDy(&dx, &dy, pipes[i].direction, pipes[i].theta);
@@ -402,9 +465,54 @@ void paint(HDC hdc)
 	graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 	Gdiplus::GraphicsContainer graphicsContainer;
 	graphicsContainer = graphics.BeginContainer();
-	paintPipes(&graphics);
+	//for (int i = 0; i < 11; ++i)
+	//{
+	//	paintPipes(&graphics, i, 15 * i);
+	//}
+	//paintPipes(&graphics, 0, 0);
+	//paintPipes(&graphics, 8, 15);
 	//graphics.SetClip(&graphics);
-	paintParticles(&graphics);
+	//paintParticles(&graphics);
+
+	//for (int i = 0; i < 5; ++i)
+	//{
+	//	int index = i;
+	//	float dashOffset = 8;
+	//	float xOffset;
+	//	float yOffset;
+	//	switch (i)
+	//	{
+	//	case 0:
+	//		xOffset = 15;
+	//		yOffset = 0;
+	//		break;
+	//	case 1:
+	//		xOffset = 0;
+	//		yOffset = -15;
+	//		break;
+	//	case 2:
+	//		xOffset = -15;
+	//		yOffset = 0;
+	//		break;
+	//	case 3:
+	//		xOffset = 0;
+	//		yOffset = 15;
+	//		break;
+	//	default:
+	//		/*xOffset = 100 * cos(pipes[i].theta);
+	//		yOffset = 100 * sin(pipes[i].theta);*/
+	//		xOffset = 100 * fabs(cos(pipes[i].theta));
+	//		yOffset = 100 * fabs(sin(pipes[i].theta));
+	//	}
+	//	paintPipes2(&graphics, index, dashOffset, 0, 0);
+	//	paintPipes2(&graphics, index, dashOffset, xOffset, yOffset);
+	//}
+
+	paintPipes(&graphics, 1, 0);
+	paintPipes(&graphics, -1, 600);
+	//paintDashes(&graphics);
+
+
 	graphics.EndContainer(graphicsContainer);
 	//paintRandomStuff(&graphics);
 }
