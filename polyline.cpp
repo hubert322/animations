@@ -47,6 +47,8 @@ const float margin = 20.0f;
 const float particleWidth = 6.0f;
 const float velocity = 5;
 
+int pipesTotalLength;
+
 void gdiplusStartup()
 {
 	Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
@@ -277,8 +279,8 @@ static void paintPipes(Gdiplus::Graphics *graphics)
 	graphics->DrawPath(&pen, &pipesPath);
 	Gdiplus::Region region(&clippingPath);
 	graphics->SetClip(&region);
-	//Gdiplus::Pen pen2(Gdiplus::Color(255, 0, 255, 0));
-	//graphics->DrawPath(&pen2, &clippingPath);
+	Gdiplus::Pen pen2(Gdiplus::Color(255, 0, 255, 0));
+	graphics->DrawPath(&pen2, &clippingPath);
 }
 
 static void setDxDy(float *dx, float *dy, directionEnum direction, float theta)
