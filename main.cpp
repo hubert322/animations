@@ -1,5 +1,4 @@
 #include <windows.h>
-#include <math.h>
 #include "polyline.h"
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
@@ -40,7 +39,7 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, PSTR, INT iCmdShow)
 		hInstance,                // program instance handle
 		NULL);                    // creation parameters
 
-	SetTimer(hWnd, 1, 50, NULL);
+	SetTimer(hWnd, 1, 100, NULL);
 
 	ShowWindow(hWnd, iCmdShow);
 	UpdateWindow(hWnd);
